@@ -2,6 +2,7 @@
 using Dnvm.Test;
 using Xunit;
 using Xunit.Abstractions;
+using Zio.FileSystems;
 
 namespace Dnvm;
 
@@ -12,6 +13,7 @@ public sealed class SelectTests : IDisposable
     private readonly TempDirectory _dnvmHome = TestUtils.CreateTempDirectory();
     private readonly Dictionary<string, string> _envVars = new();
     private readonly GlobalOptions _globalOptions;
+    private readonly DnvmFs _dnvmFs = new(new MemoryFileSystem());
 
     public SelectTests(ITestOutputHelper output)
     {
@@ -29,20 +31,21 @@ public sealed class SelectTests : IDisposable
     {
         _userHome.Dispose();
         _dnvmHome.Dispose();
+        _dnvmFs.Dispose();
     }
 
     [Fact]
     public async Task SelectPreview()
     {
         var mockServer = new MockServer();
-        var result = await InstallCommand.Run(_globalOptions, _logger, new CommandArguments.InstallArguments {
+        var result = await InstallCommand.Run(_dnvmFs, _globalOptions, _logger, new CommandArguments.InstallArguments {
             Channel = Channel.Latest,
             FeedUrl = mockServer.PrefixString,
         });
         Assert.Equal(InstallCommand.Result.Success, result);
         var defaultDotnet = Path.Combine(_globalOptions.DnvmHome, GlobalOptions.DefaultSdkDirName.Name, Utilities.DotnetExeName);
         Assert.True(File.Exists(defaultDotnet));
-        result = await InstallCommand.Run(_globalOptions, _logger, new CommandArguments.InstallArguments {
+        result = await InstallCommand.Run(_dnvmFs, _globalOptions, _logger, new CommandArguments.InstallArguments {
             Channel = Channel.Preview,
             FeedUrl = mockServer.PrefixString,
         });
@@ -55,7 +58,7 @@ public sealed class SelectTests : IDisposable
         Assert.Equal(defaultDotnet, finfo.LinkTarget);
 
         // Select the preview SDK
-        var manifest = ManifestUtils.ReadManifest(_globalOptions.ManifestPath);
+        var manifest = _dnvmFs.ReadManifest();
         Assert.Equal(GlobalOptions.DefaultSdkDirName, manifest.CurrentSdkDir);
 
         var previewSdkDir = new SdkDirName("preview");

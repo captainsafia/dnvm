@@ -8,12 +8,12 @@ namespace Dnvm;
 
 public static class SelectCommand
 {
-    public static async Task<int> Run(GlobalOptions options, Logger logger, CommandArguments.SelectArguments args)
+    public static async Task<int> Run(DnvmFs dnvmFs, GlobalOptions options, Logger logger, CommandArguments.SelectArguments args)
     {
         var newDir = new SdkDirName(args.SdkDirName);
-        var manifest = ManifestUtils.ReadOrCreateManifest(options.ManifestPath);
+        var manifest = ManifestUtils.ReadOrCreateManifest(dnvmFs);
         manifest = await SelectNewDir(options.DnvmHome, newDir, manifest);
-        File.WriteAllText(options.ManifestPath, JsonSerializer.Serialize(manifest));
+        dnvmFs.WriteManifest(manifest);
         return 0;
     }
 

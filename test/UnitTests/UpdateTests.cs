@@ -5,6 +5,7 @@ using Semver;
 using Serde.Json;
 using Xunit;
 using Xunit.Abstractions;
+using Zio.FileSystems;
 
 namespace Dnvm.Test;
 
@@ -17,6 +18,7 @@ public sealed class UpdateTests : IAsyncLifetime
     private readonly GlobalOptions _globalOptions;
     private readonly Logger _logger;
     private readonly CommandArguments.UpdateArguments _updateArguments;
+    private readonly DnvmFs _dnvmFs = new(new MemoryFileSystem());
 
     public UpdateTests(ITestOutputHelper output)
     {
@@ -43,6 +45,7 @@ public sealed class UpdateTests : IAsyncLifetime
         await _mockServer.DisposeAsync();
         _userHome.Dispose();
         _dnvmHome.Dispose();
+        _dnvmFs.Dispose();
     }
 
     [Fact]
@@ -68,7 +71,7 @@ public sealed class UpdateTests : IAsyncLifetime
             yes: false,
             _updateArguments.FeedUrl!,
             _updateArguments.DnvmReleasesUrl!,
-            _globalOptions.ManifestPath);
+            _dnvmFs);
         Assert.Contains("dnvm is out of date", writer.ToString());
     }
 
@@ -110,7 +113,7 @@ public sealed class UpdateTests : IAsyncLifetime
                 }
             })
         };
-        var result = await InstallCommand.Run(_globalOptions, _logger, new() {
+        var result = await InstallCommand.Run(_dnvmFs, _globalOptions, _logger, new() {
             Channel = channel,
             FeedUrl = _mockServer.PrefixString,
             Verbose = true
@@ -128,7 +131,7 @@ public sealed class UpdateTests : IAsyncLifetime
                 }
             })
         };
-        var updateResult = await UpdateCommand.Run(_globalOptions, _logger, _updateArguments);
+        var updateResult = await UpdateCommand.Run(_dnvmFs, _globalOptions, _logger, _updateArguments);
         var sdkVersions = ImmutableArray.Create(new[] { "41.0.100", "41.0.101" });
         Assert.Equal(UpdateCommand.Result.Success, updateResult);
         var expectedManifest = new Manifest {
@@ -139,7 +142,7 @@ public sealed class UpdateTests : IAsyncLifetime
                 InstalledSdkVersions = sdkVersions
             }})
         };
-        var actualManifest = JsonSerializer.Deserialize<Manifest>(File.ReadAllText(_globalOptions.ManifestPath));
+        var actualManifest = _dnvmFs.ReadManifest();
         Assert.Equal(expectedManifest, actualManifest);
     }
 

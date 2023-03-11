@@ -16,7 +16,6 @@ public sealed class InstallCommand
     private string _dnvmHome;
     private readonly SdkDirName _sdkDir;
     private string SdkInstallPath => Path.Combine(_dnvmHome, _sdkDir.Name);
-    private string ManifestPath => _globalOptions.ManifestPath;
 
     private readonly Logger _logger;
     private readonly CommandArguments.InstallArguments _installArgs;
@@ -67,12 +66,12 @@ public sealed class InstallCommand
         };
     }
 
-    public static Task<Result> Run(GlobalOptions options, Logger logger, CommandArguments.InstallArguments args)
+    public static Task<Result> Run(DnvmFs dnvmFs, GlobalOptions options, Logger logger, CommandArguments.InstallArguments args)
     {
-        return new InstallCommand(options, logger, args).Run();
+        return new InstallCommand(options, logger, args).Run(dnvmFs);
     }
 
-    public async Task<Result> Run()
+    public async Task<Result> Run(DnvmFs dnvmFs)
     {
         _logger.Info("Install Directory: " + _dnvmHome);
         _logger.Info("SDK install directory: " + SdkInstallPath);
@@ -93,7 +92,7 @@ public sealed class InstallCommand
             _installArgs.Channel,
             _installArgs.Force,
             _feedUrl,
-            ManifestPath,
+            dnvmFs,
             _sdkDir);
     }
 
@@ -103,14 +102,14 @@ public sealed class InstallCommand
         Channel channel,
         bool force,
         string feedUrl,
-        string manifestPath,
+        DnvmFs dnvmFs,
         SdkDirName sdkDir)
     {
         string sdkInstallDir = Path.Combine(dnvmHome, sdkDir.Name);
         Manifest manifest;
         try
         {
-            manifest = ManifestUtils.ReadOrCreateManifest(manifestPath);
+            manifest = ManifestUtils.ReadOrCreateManifest(dnvmFs);
         }
         catch (InvalidDataException)
         {
@@ -193,9 +192,7 @@ public sealed class InstallCommand
         manifest = manifest with { TrackedChannels = manifest.TrackedChannels.Replace(oldTracked, newTracked) };
 
         logger.Info("Writing manifest");
-        var tmpFile = Path.GetTempFileName();
-        File.WriteAllText(tmpFile, JsonSerializer.Serialize(manifest));
-        File.Move(tmpFile, manifestPath, overwrite: true);
+        dnvmFs.WriteManifest(manifest);
 
         logger.Log("Successfully installed");
 

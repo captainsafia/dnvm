@@ -2,6 +2,8 @@ using System.Collections.Immutable;
 using Serde.Json;
 using Xunit;
 using Xunit.Abstractions;
+using Zio;
+using Zio.FileSystems;
 using static Dnvm.InstallCommand;
 
 namespace Dnvm.Test;
@@ -13,6 +15,7 @@ public sealed class InstallTests : IDisposable
     private readonly TempDirectory _dnvmHome = TestUtils.CreateTempDirectory();
     private readonly Dictionary<string, string> _envVars = new();
     private readonly GlobalOptions _globalOptions;
+    private readonly DnvmFs _dnvmFs = new(new MemoryFileSystem());
 
     public InstallTests(ITestOutputHelper output)
     {
@@ -30,6 +33,7 @@ public sealed class InstallTests : IDisposable
     {
         _userHome.Dispose();
         _dnvmHome.Dispose();
+        _dnvmFs.Dispose();
     }
 
     [Fact]
@@ -43,7 +47,7 @@ public sealed class InstallTests : IDisposable
             FeedUrl = server.PrefixString,
         };
         var installCmd = new InstallCommand(_globalOptions, _logger, options);
-        var task = installCmd.Run();
+        var task = installCmd.Run(_dnvmFs);
         Result retVal = await task;
         Assert.Equal(Result.Success, retVal);
         var sdkInstallDir = Path.Combine(_dnvmHome.Path, GlobalOptions.DefaultSdkDirName.Name);
@@ -51,7 +55,7 @@ public sealed class InstallTests : IDisposable
         Assert.True(File.Exists(dotnetFile));
         Assert.Contains(Assets.ArchiveToken, File.ReadAllText(dotnetFile));
 
-        var manifest = File.ReadAllText(_globalOptions.ManifestPath);
+        var manifest = _dnvmFs.ReadManifest();
         var installedVersion = server.ReleasesIndexJson.Releases[0].LatestSdk;
         var installedVersions = ImmutableArray.Create(new InstalledSdk { Version = installedVersion, SdkDirName = GlobalOptions.DefaultSdkDirName });
         Assert.Equal(new Manifest
@@ -62,7 +66,7 @@ public sealed class InstallTests : IDisposable
                 SdkDirName = GlobalOptions.DefaultSdkDirName,
                 InstalledSdkVersions = ImmutableArray.Create(installedVersion)
             }})
-        }, JsonSerializer.Deserialize<Manifest>(manifest));
+        }, manifest);
     }
 
     [Fact]
@@ -78,7 +82,7 @@ public sealed class InstallTests : IDisposable
         var sdkInstallDir = Path.Combine(_globalOptions.DnvmHome, GlobalOptions.DefaultSdkDirName.Name);
         Assert.False(Directory.Exists(sdkInstallDir));
         Assert.True(Directory.Exists(_globalOptions.DnvmHome));
-        Assert.Equal(Result.Success, await InstallCommand.Run(_globalOptions, _logger, args));
+        Assert.Equal(Result.Success, await InstallCommand.Run(_dnvmFs, _globalOptions, _logger, args));
         var dotnetFile = Path.Combine(sdkInstallDir, "dotnet" + Utilities.ExeSuffix);
         Assert.True(File.Exists(dotnetFile));
         Assert.Contains(Assets.ArchiveToken, File.ReadAllText(dotnetFile));
@@ -101,7 +105,7 @@ public sealed class InstallTests : IDisposable
         var sdkInstallDir = Path.Combine(_globalOptions.DnvmHome, Channel.Preview.ToString().ToLowerInvariant());
         Assert.False(Directory.Exists(sdkInstallDir));
         Assert.True(Directory.Exists(_globalOptions.DnvmHome));
-        Assert.Equal(Result.Success, await InstallCommand.Run(_globalOptions, _logger, args));
+        Assert.Equal(Result.Success, await InstallCommand.Run(_dnvmFs, _globalOptions, _logger, args));
         var dotnetFile = Path.Combine(sdkInstallDir, "dotnet" + Utilities.ExeSuffix);
         Assert.True(File.Exists(dotnetFile));
         Assert.Contains(Assets.ArchiveToken, File.ReadAllText(dotnetFile));
@@ -125,7 +129,7 @@ public sealed class InstallTests : IDisposable
         var sdkInstallDir = Path.Combine(_globalOptions.DnvmHome, dirName);
         Assert.False(Directory.Exists(sdkInstallDir));
         Assert.True(Directory.Exists(_globalOptions.DnvmHome));
-        Assert.Equal(Result.Success, await InstallCommand.Run(_globalOptions, _logger, args));
+        Assert.Equal(Result.Success, await InstallCommand.Run(_dnvmFs, _globalOptions, _logger, args));
         var dotnetFile = Path.Combine(sdkInstallDir, "dotnet" + Utilities.ExeSuffix);
         Assert.True(File.Exists(dotnetFile));
         Assert.Contains(Assets.ArchiveToken, File.ReadAllText(dotnetFile));

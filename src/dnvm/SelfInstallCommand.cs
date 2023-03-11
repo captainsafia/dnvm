@@ -19,7 +19,6 @@ public class SelfInstallCommand
     private readonly GlobalOptions _globalOptions;
     // Place to install dnvm
     private string _dnvmHome;
-    private string ManifestPath => _globalOptions.ManifestPath;
     private readonly CommandArguments.SelfInstallArguments _installArgs;
     private readonly string _feedUrl;
 
@@ -150,7 +149,7 @@ public class SelfInstallCommand
             channel,
             _installArgs.Force,
             _feedUrl,
-            ManifestPath,
+            dnvmFs,
             sdkDirName);
 
         if (result is not InstallCommand.Result.Success)

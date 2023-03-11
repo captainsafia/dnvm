@@ -44,6 +44,4 @@ public readonly record struct GlobalOptions
 
     public required Func<string, string?> GetUserEnvVar { get; init; }
     public required Action<string, string> SetUserEnvVar { get; init; }
-
-    public string ManifestPath => Path.Combine(DnvmHome, ManifestFileName);
 }

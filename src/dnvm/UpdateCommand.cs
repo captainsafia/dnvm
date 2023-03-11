@@ -20,7 +20,6 @@ public sealed partial class UpdateCommand
     private readonly CommandArguments.UpdateArguments _args;
     private readonly string _feedUrl;
     private readonly string _releasesUrl;
-    private readonly string _manifestPath;
 
     public const string DefaultReleasesUrl = "https://github.com/dn-vm/dn-vm.github.io/raw/gh-pages/releases.json";
 
@@ -38,13 +37,12 @@ public sealed partial class UpdateCommand
             _feedUrl = _feedUrl[..^1];
         }
         _releasesUrl = _args.DnvmReleasesUrl ?? DefaultReleasesUrl;
-        _manifestPath = options.ManifestPath;
         _dnvmHome = options.DnvmHome;
     }
 
-    public static Task<Result> Run(GlobalOptions options, Logger logger, CommandArguments.UpdateArguments args)
+    public static Task<Result> Run(DnvmFs dnvmFs, GlobalOptions options, Logger logger, CommandArguments.UpdateArguments args)
     {
-        return new UpdateCommand(options, logger, args).Run();
+        return new UpdateCommand(options, logger, args).Run(dnvmFs);
     }
 
     public enum Result
@@ -55,7 +53,7 @@ public sealed partial class UpdateCommand
         SelfUpdateFailed
     }
 
-    public async Task<Result> Run()
+    public async Task<Result> Run(DnvmFs dnvmFs)
     {
         if (_args.Self)
         {
@@ -74,7 +72,7 @@ public sealed partial class UpdateCommand
             return CouldntFetchIndex;
         }
 
-        var manifest = ManifestUtils.ReadOrCreateManifest(_manifestPath);
+        var manifest = ManifestUtils.ReadOrCreateManifest(dnvmFs);
         return await UpdateSdks(
             _dnvmHome,
             _logger,
@@ -83,7 +81,7 @@ public sealed partial class UpdateCommand
             _args.Yes,
             _feedUrl,
             _releasesUrl,
-            _manifestPath);
+            dnvmFs);
     }
 
     public static async Task<Result> UpdateSdks(
@@ -94,7 +92,7 @@ public sealed partial class UpdateCommand
         bool yes,
         string feedUrl,
         string releasesUrl,
-        string manifestPath)
+        DnvmFs dnvmFs)
     {
         logger.Log("Looking for available updates");
         // Check for dnvm updates
@@ -149,9 +147,7 @@ public sealed partial class UpdateCommand
         }
 
         logger.Info("Writing manifest");
-        var tmpFile = Path.GetTempFileName();
-        File.WriteAllText(tmpFile, JsonSerializer.Serialize(manifest));
-        File.Move(tmpFile, manifestPath, overwrite: true);
+        dnvmFs.WriteManifest(manifest);
 
         logger.Log("Successfully installed");
         return Success;

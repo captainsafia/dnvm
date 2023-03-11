@@ -44,6 +44,9 @@ public sealed class DnvmFs : IDisposable
     public void WriteManifest(Manifest manifest)
     {
         var text = JsonSerializer.Serialize(manifest);
+        // Note: there's a race condition here where multiple processes could be writing to the same
+        // file at the same time. .NET Core 3.0 has an "overwrite" parameter, but it's not available
+        // in Zio yet.
         Vfs.WriteAllText(ManifestPath, text);
     }
 
